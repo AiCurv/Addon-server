@@ -4,8 +4,6 @@ plugins {
     id("com.chaquo.python")
 }
 
-val kotlinVersion = rootProject.extra["kotlin_version"] as String
-
 android {
     namespace = "com.addonserver"
     compileSdk = 30
@@ -67,16 +65,11 @@ chaquopy {
         // Python 3.8 for broad Android compatibility
         version = "3.8"
 
-        // Static Python for smaller APK (no pip at runtime)
-        buildPython("/usr/bin/python3")
-
         pip {
             // No external pip packages - use stdlib only for minimal footprint
-            install("")
         }
     }
 
-    // Include only the specific Python source files we need
     sourceSets {
         getByName("main") {
             setSrcDirs(listOf("src/main/python"))

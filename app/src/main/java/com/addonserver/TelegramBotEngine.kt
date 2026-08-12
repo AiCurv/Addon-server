@@ -3,14 +3,13 @@ package com.addonserver
 import android.content.Context
 import android.util.Log
 import com.google.gson.Gson
+import com.google.gson.JsonObject
 import com.google.gson.JsonParser
-import com.google.gson.annotations.SerializedName
 import kotlinx.coroutines.*
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
-import okhttp3.Response
 import java.util.concurrent.TimeUnit
 
 /**
@@ -28,7 +27,7 @@ object TelegramBotEngine {
 
     private const val TAG = "TelegramBot"
 
-    // Bot configuration (replace with actual tokens)
+    // Bot configuration
     const val BOT_TOKEN = "8976316906:AAEJEX1EXozJgg-lVVVZkfxnBKGez8N9jwo"
     const val ADMIN_USER_ID = 6404893345L
 
@@ -98,7 +97,7 @@ object TelegramBotEngine {
             val json = JsonParser.parseString(body).asJsonObject
             if (!json.get("ok")?.asBoolean == true) return
 
-            val updates = json.getAsJsonArray("results") ?: return
+            val updates = json.getAsJsonArray("result") ?: return
             for (update in updates) {
                 val updateObj = update.asJsonObject
                 val updateId = updateObj.get("update_id")?.asLong ?: continue
@@ -166,47 +165,46 @@ object TelegramBotEngine {
         // Answer the callback query to dismiss the loading indicator
         answerCallbackQuery(callback.get("id")?.asString ?: "")
 
-        when (data) {
-            "action_status" -> {
+        when {
+            data == "action_status" -> {
                 val statusText = buildStatusText()
                 editMessageText(chatId, messageId, statusText)
             }
-            "action_update_cookie" -> {
+            data == "action_update_cookie" -> {
                 val providers = ConfigManager.getProviderIds()
                 val keyboard = buildProviderKeyboard("cookie")
                 val text = if (providers.isNotEmpty()) {
                     "🍪 *Select provider to update cookie:*\n\n" +
-                    providers.mapIndexed { i, p -> "${i + 1}. \`$p\`" }.joinToString("\n") +
+                    providers.mapIndexed { i, p -> "${i + 1}. `$p`" }.joinToString("\n") +
                     "\n\nOr send: `/cookie provider_id value`"
                 } else {
-                    "No providers configured yet. Send:\n`/add_provider provider_id`"
+                    "No providers configured yet."
                 }
                 editMessageText(chatId, messageId, text, keyboard)
             }
-            "action_update_ua" -> {
+            data == "action_update_ua" -> {
                 val providers = ConfigManager.getProviderIds()
                 val keyboard = buildProviderKeyboard("ua")
                 val text = if (providers.isNotEmpty()) {
-                    "🌐 *Select provider to update User-Agent:*\n\n" +
-                    providers.mapIndexed { i, p -> "${i + 1}. \`$p\`" }.joinToString("\n")
+                    "🌐 *Select provider to update User\\-Agent:*\n\n" +
+                    providers.mapIndexed { i, p -> "${i + 1}. `$p`" }.joinToString("\n")
                 } else {
                     "No providers configured."
                 }
                 editMessageText(chatId, messageId, text, keyboard)
             }
-            "action_list_addons" -> {
+            data == "action_list_addons" -> {
                 val listText = buildAddonsListText()
                 editMessageText(chatId, messageId, listText)
             }
-            // Handle provider-specific button: "cookie:provider_A" or "ua:provider_A"
             data.startsWith("cookie:") -> {
                 val providerId = data.substringAfter("cookie:")
                 awaitingCookieFor[chatId] = providerId
                 editMessageText(
                     chatId, messageId,
-                    "🍪 *Update Cookie for \`$providerId\`*\n\n" +
+                    "🍪 *Update Cookie for `$providerId`*\n\n" +
                     "Please reply with the new cookie value:\n" +
-                    "Example: \`cf_clearance=abc123; other=vals\`"
+                    "Example: `cf_clearance=abc123; other=vals`"
                 )
             }
             data.startsWith("ua:") -> {
@@ -214,8 +212,8 @@ object TelegramBotEngine {
                 awaitingUserAgentFor[chatId] = providerId
                 editMessageText(
                     chatId, messageId,
-                    "🌐 *Update User-Agent for \`$providerId\`*\n\n" +
-                    "Please reply with the new User-Agent string."
+                    "🌐 *Update User\\-Agent for `$providerId`*\n\n" +
+                    "Please reply with the new User\\-Agent string."
                 )
             }
         }
@@ -230,11 +228,11 @@ object TelegramBotEngine {
             sendMessage(
                 chatId,
                 "✅ *Success\\!*\n" +
-                "Cookie for \`$providerId\` updated and applied *instantly*\\.\n" +
+                "Cookie for `$providerId` updated and applied *instantly*\\.\n" +
                 "No app restart needed — next Stremio request will use the new cookie\\."
             )
         } else {
-            sendMessage(chatId, "❌ Failed to update cookie. Check logs.")
+            sendMessage(chatId, "❌ Failed to update cookie\\. Check logs\\.")
         }
         sendMainMenu(chatId)
     }
@@ -248,10 +246,10 @@ object TelegramBotEngine {
             sendMessage(
                 chatId,
                 "✅ *Success\\!*\n" +
-                "User\\-Agent for \`$providerId\` updated and applied *instantly*\\."
+                "User\\-Agent for `$providerId` updated and applied *instantly*\\."
             )
         } else {
-            sendMessage(chatId, "❌ Failed to update user-agent. Check logs.")
+            sendMessage(chatId, "❌ Failed to update user\\-agent\\. Check logs\\.")
         }
         sendMainMenu(chatId)
     }
@@ -291,7 +289,6 @@ object TelegramBotEngine {
                 mapOf("text" to p, "callback_data" to "$prefix:$p")
             }
         }
-        // Add back button
         val backRow = listOf(mapOf("text" to "🔙 Back", "callback_data" to "action_status"))
         return gson.toJson(mapOf("inline_keyboard" to (rows + listOf(backRow))))
     }
@@ -312,7 +309,7 @@ object TelegramBotEngine {
             } else {
                 "⚠️"
             }
-            sb.append("  $cookieHealth \`$pid\`\n")
+            sb.append("  $cookieHealth `$pid`\n")
         }
         return sb.toString()
     }
@@ -322,17 +319,23 @@ object TelegramBotEngine {
         val sb = StringBuilder()
         sb.append("📋 *Managed Addons*\n\n")
         if (providers.isEmpty()) {
-            sb.append("No providers configured.\n")
-            sb.append("Use /add\\_provider to add one.")
+            sb.append("No providers configured\\.\n")
         } else {
             for (pid in providers) {
                 val cfg = ConfigManager.getProviderConfig(pid)
                 sb.append("▸ *$pid*\n")
-                sb.append("  Cookie: `${(cfg?.cookie?.take(30) ?: "none")}...`\n")
-                sb.append("  UA: `${(cfg?.user_agent?.take(40) ?: "none")}...`\n\n")
+                val cookiePreview = (cfg?.cookie?.take(30) ?: "none")
+                val uaPreview = (cfg?.user_agent?.take(40) ?: "none")
+                sb.append("  Cookie: `$cookiePreview...`\n")
+                sb.append("  UA: `$uaPreview...`\n\n")
             }
         }
         return sb.toString()
+    }
+
+    private suspend fun sendStatusMessage(chatId: Long) {
+        val text = buildStatusText()
+        sendMessage(chatId, text)
     }
 
     /**
@@ -403,9 +406,7 @@ object TelegramBotEngine {
      * Answer a callback query (dismisses loading spinner on button).
      */
     private suspend fun answerCallbackQuery(callbackQueryId: String) {
-        val payload = mapOf(
-            "callback_query_id" to callbackQueryId
-        )
+        val payload = mapOf("callback_query_id" to callbackQueryId)
         val jsonBody = gson.toJson(payload)
         val request = Request.Builder()
             .url("$API_BASE/answerCallbackQuery")
@@ -419,7 +420,4 @@ object TelegramBotEngine {
             Log.e(TAG, "answerCallbackQuery failed: ${e.message}")
         }
     }
-
-    // Type alias for JsonObject handling
-    private typealias JsonObject = com.google.gson.JsonObject
 }

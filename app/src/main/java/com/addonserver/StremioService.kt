@@ -3,22 +3,19 @@ package com.addonserver
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
-import android.app.Service
 import android.content.Context
 import android.content.Intent
 import android.net.wifi.WifiManager
 import android.os.Build
 import android.os.IBinder
 import android.os.PowerManager
-import androidx.annotation.RequiresApi
 import androidx.lifecycle.LifecycleService
 import androidx.lifecycle.lifecycleScope
 import com.chaquo.python.PyException
 import com.chaquo.python.Python
-import com.chaquo.python.android.AndroidPlatform
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 
 /**
  * Foreground Service that:
@@ -42,7 +39,6 @@ class StremioService : LifecycleService() {
 
     private var wakeLock: PowerManager.WakeLock? = null
     private var wifiLock: WifiManager.WifiLock? = null
-    private var pythonServerRunning = false
 
     override fun onCreate() {
         super.onCreate()
@@ -66,6 +62,9 @@ class StremioService : LifecycleService() {
 
         // Start Telegram Bot
         TelegramBotEngine.start(this)
+
+        // Keep wake lock alive
+        keepWakeLockAlive()
 
         isRunning = true
         return START_STICKY
@@ -105,6 +104,7 @@ class StremioService : LifecycleService() {
         }
     }
 
+    @Suppress("DEPRECATION")
     private fun buildNotification(): Notification {
         return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             Notification.Builder(this, CHANNEL_ID)
@@ -114,7 +114,6 @@ class StremioService : LifecycleService() {
                 .setOngoing(true)
                 .build()
         } else {
-            @Suppress("DEPRECATION")
             Notification.Builder(this)
                 .setContentTitle("Addon Server Active")
                 .setContentText("Stremio server on port $SERVER_PORT")
@@ -152,16 +151,12 @@ class StremioService : LifecycleService() {
 
     private fun releaseWakeLocks() {
         try {
-            wakeLock?.let {
-                if (it.isHeld) it.release()
-            }
-        } catch (e: Exception) { }
+            wakeLock?.let { if (it.isHeld) it.release() }
+        } catch (_: Exception) { }
 
         try {
-            wifiLock?.let {
-                if (it.isHeld) it.release()
-            }
-        } catch (e: Exception) { }
+            wifiLock?.let { if (it.isHeld) it.release() }
+        } catch (_: Exception) { }
     }
 
     /**
@@ -180,10 +175,7 @@ class StremioService : LifecycleService() {
                 // Pass config file path and port to Python
                 val configPath = ConfigManager.getConfigFilePath()
                 module.callAttr("start_server", configPath, SERVER_PORT)
-
-                pythonServerRunning = true
             } catch (e: PyException) {
-                // Python error - log but don't crash the service
                 e.printStackTrace()
             } catch (e: Exception) {
                 e.printStackTrace()
@@ -197,10 +189,7 @@ class StremioService : LifecycleService() {
                 val py = Python.getInstance()
                 val module = py.getModule("addon_server")
                 module.callAttr("stop_server")
-                pythonServerRunning = false
-            } catch (e: Exception) {
-                e.printStackTrace()
-            }
+            } catch (_: Exception) { }
         }
     }
 
@@ -210,7 +199,7 @@ class StremioService : LifecycleService() {
     private fun keepWakeLockAlive() {
         lifecycleScope.launch(Dispatchers.Default) {
             while (isRunning) {
-                kotlinx.coroutines.delay(30 * 60 * 1000L) // 30 minutes
+                delay(30 * 60 * 1000L) // 30 minutes
                 try {
                     wakeLock?.let {
                         if (!it.isHeld) it.acquire(12 * 60 * 60 * 1000L)
@@ -218,7 +207,7 @@ class StremioService : LifecycleService() {
                     wifiLock?.let {
                         if (!it.isHeld) it.acquire()
                     }
-                } catch (e: Exception) { }
+                } catch (_: Exception) { }
             }
         }
     }
