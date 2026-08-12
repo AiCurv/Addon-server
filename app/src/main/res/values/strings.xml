@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Addon Server</string>
+    <string name="server_status_label">Server Status</string>
+    <string name="bot_status_label">Bot Status</string>
+    <string name="local_ip_label">Local IP</string>
+    <string name="server_url_label">Stremio URL</string>
+    <string name="status_running">Running</string>
+    <string name="status_stopped">Stopped</string>
+    <string name="status_connected">Connected</string>
+    <string name="status_disconnected">Disconnected</string>
+    <string name="btn_start">Start Server</string>
+    <string name="btn_stop">Stop Server</string>
+    <string name="notification_channel_name">Addon Server</string>
+    <string name="notification_channel_desc">Stremio addon server is running</string>
+    <string name="notification_title">Addon Server Active</string>
+    <string name="notification_text">Stremio server on port 7000</string>
+    <string name="config_providers_label">Active Providers</string>
+</resources>

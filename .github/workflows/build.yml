@@ -1,0 +1,76 @@
+name: Build APK
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:  # Allow manual trigger
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Set up Python 3.8
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.8'
+
+      - name: Cache Gradle packages
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-${{ runner.os }}-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+          restore-keys: gradle-${{ runner.os }}-
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+      - name: Build Debug APK
+        run: ./gradlew assembleDebug --no-daemon --stacktrace
+        env:
+          ANDROID_HOME: /usr/local/lib/android/sdk
+
+      - name: Build Release APK
+        run: ./gradlew assembleRelease --no-daemon --stacktrace
+        env:
+          ANDROID_HOME: /usr/local/lib/android/sdk
+
+      - name: Upload Debug APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: addon-server-debug
+          path: app/build/outputs/apk/debug/*.apk
+          retention-days: 30
+
+      - name: Upload Release APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: addon-server-release
+          path: app/build/outputs/apk/release/*.apk
+          retention-days: 30
+
+      - name: Check APK architecture
+        run: |
+          echo "=== Checking APK architecture ==="
+          APK_FILE=$(find app/build/outputs/apk/debug -name "*.apk" | head -1)
+          if [ -n "$APK_FILE" ]; then
+            echo "APK: $APK_FILE"
+            unzip -l "$APK_FILE" | grep "lib/" || echo "No native libs (Java/Kotlin only)"
+            echo "---"
+            echo "APK size: $(du -h "$APK_FILE" | cut -f1)"
+          else
+            echo "No APK found"
+          fi
