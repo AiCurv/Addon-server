@@ -16,8 +16,9 @@ android {
         versionName = "1.0.0"
 
         // Force 32-bit only for Skyworth mt5867 (armeabi-v7a)
+        // Note: Chaquopy doesn't support 'armeabi', only armeabi-v7a
         ndk {
-            abiFilters += listOf("armeabi-v7a", "armeabi")
+            abiFilters += listOf("armeabi-v7a")
         }
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
