@@ -62,7 +62,7 @@ android {
 
     // Disable lint checks that block release build for sideloaded TV app
     lint {
-        isAbortOnError = false
+        abortOnError = false
         disable += listOf(
             "ExpiredTargetSdkVersion",  // TV app sideloaded, not Play Store
             "OldTargetApi"
