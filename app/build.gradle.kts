@@ -26,8 +26,8 @@ android {
 
     buildTypes {
         release {
-            isMinifyEnabled = true
-            isShrinkResources = true
+            isMinifyEnabled = false  // Disable minify for now (Chaquopy + ProGuard issues)
+            isShrinkResources = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
@@ -58,6 +58,15 @@ android {
                 "META-INF/NOTICE.txt"
             )
         }
+    }
+
+    // Disable lint checks that block release build for sideloaded TV app
+    lint {
+        isAbortOnError = false
+        disable += listOf(
+            "ExpiredTargetSdkVersion",  // TV app sideloaded, not Play Store
+            "OldTargetApi"
+        )
     }
 }
 
