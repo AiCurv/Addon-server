@@ -50,20 +50,12 @@ class StremioService : LifecycleService() {
 
         if (isRunning) return START_STICKY
 
-        // Start as foreground service immediately (Android 8+ requirement)
         val notification = buildNotification()
         startForeground(NOTIFICATION_ID, notification)
 
-        // Acquire wake locks
         acquireWakeLocks()
-
-        // Start Python HTTP server
         startPythonServer()
-
-        // Start Telegram Bot
         TelegramBotEngine.start(this)
-
-        // Keep wake lock alive
         keepWakeLockAlive()
 
         isRunning = true
@@ -83,11 +75,6 @@ class StremioService : LifecycleService() {
         isRunning = false
     }
 
-    /**
-     * Create low-priority notification channel for Android TV Leanback.
-     * Uses IMPORTANCE_LOW so it doesn't pop up as a heads-up notification
-     * which would interfere with TV viewing.
-     */
     private fun createNotificationChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(
@@ -124,22 +111,15 @@ class StremioService : LifecycleService() {
         }
     }
 
-    /**
-     * Acquire PARTIAL_WAKE_LOCK to keep CPU running when screen off,
-     * and WIFI_MODE_FULL_HIGH_PERF to maintain low-latency WiFi
-     * (prevents TV from throttling network when display dims).
-     */
     private fun acquireWakeLocks() {
-        // Partial wake lock - keeps CPU alive
         val powerManager = getSystemService(Context.POWER_SERVICE) as PowerManager
         wakeLock = powerManager.newWakeLock(
             PowerManager.PARTIAL_WAKE_LOCK,
             "AddonServer::StremioWakeLock"
         ).apply {
-            acquire(12 * 60 * 60 * 1000L) // 12 hours max, re-acquire periodically
+            acquire(12 * 60 * 60 * 1000L)
         }
 
-        // High-performance WiFi lock - prevents WiFi throttling
         val wifiManager = applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager
         wifiLock = wifiManager.createWifiLock(
             WifiManager.WIFI_MODE_FULL_HIGH_PERF,
@@ -151,28 +131,29 @@ class StremioService : LifecycleService() {
 
     private fun releaseWakeLocks() {
         try {
-            wakeLock?.let { if (it.isHeld) it.release() }
-        } catch (_: Exception) { }
+            val wl = wakeLock
+            if (wl != null && wl.isHeld) {
+                wl.release()
+            }
+        } catch (e: Exception) {
+            // Ignore
+        }
 
         try {
-            wifiLock?.let { if (it.isHeld) it.release() }
-        } catch (_: Exception) { }
+            val wfl = wifiLock
+            if (wfl != null && wfl.isHeld) {
+                wfl.release()
+            }
+        } catch (e: Exception) {
+            // Ignore
+        }
     }
 
-    /**
-     * Start the embedded Python HTTP server via Chaquopy.
-     * The Python script runs addon_server.py which handles:
-     * - /manifest.json (Stremio addon manifest)
-     * - /stream/* (video stream proxy with dynamic Cloudflare headers)
-     * - /catalog/* (content catalogs)
-     */
     private fun startPythonServer() {
         lifecycleScope.launch(Dispatchers.Default) {
             try {
                 val py = Python.getInstance()
                 val module = py.getModule("addon_server")
-
-                // Pass config file path and port to Python
                 val configPath = ConfigManager.getConfigFilePath()
                 module.callAttr("start_server", configPath, SERVER_PORT)
             } catch (e: PyException) {
@@ -189,25 +170,28 @@ class StremioService : LifecycleService() {
                 val py = Python.getInstance()
                 val module = py.getModule("addon_server")
                 module.callAttr("stop_server")
-            } catch (_: Exception) { }
+            } catch (e: Exception) {
+                // Ignore
+            }
         }
     }
 
-    /**
-     * Periodically re-acquire wake lock (Android may release long-held locks).
-     */
     private fun keepWakeLockAlive() {
         lifecycleScope.launch(Dispatchers.Default) {
             while (isRunning) {
-                delay(30 * 60 * 1000L) // 30 minutes
+                delay(30 * 60 * 1000L)
                 try {
-                    wakeLock?.let {
-                        if (!it.isHeld) it.acquire(12 * 60 * 60 * 1000L)
+                    val wl = wakeLock
+                    if (wl != null && !wl.isHeld) {
+                        wl.acquire(12 * 60 * 60 * 1000L)
                     }
-                    wifiLock?.let {
-                        if (!it.isHeld) it.acquire()
+                    val wfl = wifiLock
+                    if (wfl != null && !wfl.isHeld) {
+                        wfl.acquire()
                     }
-                } catch (_: Exception) { }
+                } catch (e: Exception) {
+                    // Ignore
+                }
             }
         }
     }

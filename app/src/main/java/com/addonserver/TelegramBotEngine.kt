@@ -95,7 +95,7 @@ object TelegramBotEngine {
             response.close()
 
             val json = JsonParser.parseString(body).asJsonObject
-            if (!json.get("ok")?.asBoolean == true) return
+            if (json.get("ok")?.asBoolean != true) return
 
             val updates = json.getAsJsonArray("result") ?: return
             for (update in updates) {
